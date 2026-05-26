@@ -1,150 +1,85 @@
-# How do I submit patches to Android Common Kernels
+# kernel_samsung_sm8550-droidspaces
 
-1. BEST: Make all of your changes to upstream Linux. If appropriate, backport to the stable releases.
-   These patches will be merged automatically in the corresponding common kernels. If the patch is already
-   in upstream Linux, post a backport of the patch that conforms to the patch requirements below.
-   - Do not send patches upstream that contain only symbol exports. To be considered for upstream Linux,
-additions of `EXPORT_SYMBOL_GPL()` require an in-tree modular driver that uses the symbol -- so include
-the new driver or changes to an existing driver in the same patchset as the export.
-   - When sending patches upstream, the commit message must contain a clear case for why the patch
-is needed and beneficial to the community. Enabling out-of-tree drivers or functionality is not
-not a persuasive case.
+Samsung SM8550 (Snapdragon 8 Gen 2 / Galaxy S23) kernel 5.15.185 with Droidspaces support and KernelSU-Next integration.
 
-2. LESS GOOD: Develop your patches out-of-tree (from an upstream Linux point-of-view). Unless these are
-   fixing an Android-specific bug, these are very unlikely to be accepted unless they have been
-   coordinated with kernel-team@android.com. If you want to proceed, post a patch that conforms to the
-   patch requirements below.
+## What is Droidspaces?
 
-# Common Kernel patch requirements
+Droidspaces is a containerization solution for Android that creates isolated Linux containers using kernel namespaces (PID, MNT, UTS, IPC, Cgroup, Network). Unlike simple chroot, Droidspaces provides true process isolation, allowing you to run full Linux distributions (Debian, Ubuntu, Arch, Fedora) with their own init system, hostname, IPC, and optional network stack — all natively on your Android device.
 
-- All patches must conform to the Linux kernel coding standards and pass `scripts/checkpatch.pl`
-- Patches shall not break gki_defconfig or allmodconfig builds for arm, arm64, x86, x86_64 architectures
-(see  https://source.android.com/setup/build/building-kernels)
-- If the patch is not merged from an upstream branch, the subject must be tagged with the type of patch:
-`UPSTREAM:`, `BACKPORT:`, `FROMGIT:`, `FROMLIST:`, or `ANDROID:`.
-- All patches must have a `Change-Id:` tag (see https://gerrit-review.googlesource.com/Documentation/user-changeid.html)
-- If an Android bug has been assigned, there must be a `Bug:` tag.
-- All patches must have a `Signed-off-by:` tag by the author and the submitter
+This enables use cases like:
+- Running a full Linux desktop (XFCE, KDE) with GPU acceleration via Termux-X11
+- Development environments on Android
+- Isolated services and sandboxed applications
+- Native Adreno GPU acceleration via Turnip/Mesa drivers
 
-Additional requirements are listed below based on patch type
+## Kernel Configuration
 
-## Requirements for backports from mainline Linux: `UPSTREAM:`, `BACKPORT:`
+All Droidspaces-required configs enabled in `arch/arm64/configs/gki_defconfig`:
 
-- If the patch is a cherry-pick from Linux mainline with no changes at all
-    - tag the patch subject with `UPSTREAM:`.
-    - add upstream commit information with a `(cherry picked from commit ...)` line
-    - Example:
-        - if the upstream commit message is
-```
-        important patch from upstream
+| Config | Purpose |
+|--------|---------|
+| `CONFIG_SYSVIPC=y` | System V IPC (required for IPC namespace) |
+| `CONFIG_POSIX_MQUEUE=y` | POSIX message queues |
+| `CONFIG_IPC_NS=y` | IPC namespace isolation |
+| `CONFIG_PID_NS=y` | PID namespace isolation |
+| `CONFIG_CGROUP_PIDS=y` | PIDs cgroup controller |
+| `CONFIG_CGROUP_DEVICE=y` | Device cgroup controller |
+| `CONFIG_DEVTMPFS=y` | Auto-mounted devtmpfs |
+| `CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y` | Netfilter addrtype match |
+| `CONFIG_NETFILTER_XT_TARGET_LOG=y` | Netfilter LOG target |
+| `CONFIG_NETFILTER_XT_MATCH_RECENT=y` | Netfilter recent match |
+| `CONFIG_IP_SET=y` | IP sets framework |
+| `CONFIG_IP_SET_HASH_IP=y` | IP set hash:ip type |
+| `CONFIG_IP_SET_HASH_NET=y` | IP set hash:net type |
+| `CONFIG_NETFILTER_XT_SET=y` | Netfilter IP set match/target |
+| `CONFIG_TMPFS_POSIX_ACL=y` | POSIX ACLs on tmpfs |
+| `CONFIG_TMPFS_XATTR=y` | Extended attributes on tmpfs |
+| `CONFIG_IP_NF_TARGET_REJECT=y` | IPv4 REJECT target |
+| `CONFIG_IP6_NF_TARGET_REJECT=y` | IPv6 REJECT target |
 
-        This is the detailed description of the important patch
+Additional modifications:
+- `CONFIG_MODVERSIONS` disabled — prevents CRC mismatch bootloop with vendor modules
+- Vermagic hardcoded to vendor string: `5.15.178-android13-8-31998796-abS911BXXS8EYK2 SMP preempt mod_unload modversions aarch64`
 
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-```
->- then Joe Smith would upload the patch for the common kernel as
-```
-        UPSTREAM: important patch from upstream
+## KABI Patch
 
-        This is the detailed description of the important patch
+Applied Droidspaces kABI patch for GKI kernels below 6.12:
+- **ANDROID_KABI_USE(3)** → `struct sysv_sem sysvsem` in `task_struct`
+- **_ANDROID_KABI_REPLACE(4, 5)** → `struct sysv_shm sysvshm` in `task_struct`
 
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
+This fills the Android KABI reserve slots in `include/linux/sched.h` without changing `task_struct` size, preserving binary compatibility with vendor modules.
 
-        Bug: 135791357
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        (cherry picked from commit c31e73121f4c1ec41143423ac6ce3ce6dafdcec1)
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
-```
+## KernelSU-Next
 
-- If the patch requires any changes from the upstream version, tag the patch with `BACKPORT:`
-instead of `UPSTREAM:`.
-    - use the same tags as `UPSTREAM:`
-    - add comments about the changes under the `(cherry picked from commit ...)` line
-    - Example:
-```
-        BACKPORT: important patch from upstream
+**KernelSU-Next v3.2.0** integrated with manual hooks (no kprobes):
+- `CONFIG_KSU=y`
+- `CONFIG_KSU_WITH_KPROBES=n`
 
-        This is the detailed description of the important patch
+KernelSU-Next source is cloned to `KernelSU-Next/` and symlinked at `drivers/kernelsu`.
 
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
+## Building
 
-        Bug: 135791357
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        (cherry picked from commit c31e73121f4c1ec41143423ac6ce3ce6dafdcec1)
-        [joe: Resolved minor conflict in drivers/foo/bar.c ]
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
+### Prerequisites
+
+- Clang builder (tested with `clang-r547379`)
+- Place it at `../tools/google-clang/` relative to this kernel source
+
+### Build
+
+```bash
+bash scripts/build.sh
 ```
 
-## Requirements for other backports: `FROMGIT:`, `FROMLIST:`,
+The build script automatically copies `vendor-symvers/Module.symvers` to the source root before compilation. This file contains merged CRCs from Samsung vendor modules to ensure compatibility.
 
-- If the patch has been merged into an upstream maintainer tree, but has not yet
-been merged into Linux mainline
-    - tag the patch subject with `FROMGIT:`
-    - add info on where the patch came from as `(cherry picked from commit <sha1> <repo> <branch>)`. This
-must be a stable maintainer branch (not rebased, so don't use `linux-next` for example).
-    - if changes were required, use `BACKPORT: FROMGIT:`
-    - Example:
-        - if the commit message in the maintainer tree is
-```
-        important patch from upstream
+### Flash
 
-        This is the detailed description of the important patch
+Pack the resulting `out/arch/arm64/boot/Image.gz` into an AnyKernel3 zip and flash via TWRP.
 
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-```
->- then Joe Smith would upload the patch for the common kernel as
-```
-        FROMGIT: important patch from upstream
+## Device Info
 
-        This is the detailed description of the important patch
-
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-
-        Bug: 135791357
-        (cherry picked from commit 878a2fd9de10b03d11d2f622250285c7e63deace
-         https://git.kernel.org/pub/scm/linux/kernel/git/foo/bar.git test-branch)
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
-```
-
-
-- If the patch has been submitted to LKML, but not accepted into any maintainer tree
-    - tag the patch subject with `FROMLIST:`
-    - add a `Link:` tag with a link to the submittal on lore.kernel.org
-    - add a `Bug:` tag with the Android bug (required for patches not accepted into
-a maintainer tree)
-    - if changes were required, use `BACKPORT: FROMLIST:`
-    - Example:
-```
-        FROMLIST: important patch from upstream
-
-        This is the detailed description of the important patch
-
-        Signed-off-by: Fred Jones <fred.jones@foo.org>
-
-        Bug: 135791357
-        Link: https://lore.kernel.org/lkml/20190619171517.GA17557@someone.com/
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
-```
-
-## Requirements for Android-specific patches: `ANDROID:`
-
-- If the patch is fixing a bug to Android-specific code
-    - tag the patch subject with `ANDROID:`
-    - add a `Fixes:` tag that cites the patch with the bug
-    - Example:
-```
-        ANDROID: fix android-specific bug in foobar.c
-
-        This is the detailed description of the important fix
-
-        Fixes: 1234abcd2468 ("foobar: add cool feature")
-        Change-Id: I4caaaa566ea080fa148c5e768bb1a0b6f7201c01
-        Signed-off-by: Joe Smith <joe.smith@foo.org>
-```
-
-- If the patch is a new feature
-    - tag the patch subject with `ANDROID:`
-    - add a `Bug:` tag with the Android bug (required for android-specific features)
-
+- **Device**: Samsung Galaxy S23 (SM-S911B)
+- **SoC**: Snapdragon 8 Gen 2 (SM8550)
+- **GPU**: Adreno 740 (Turnip driver supported)
+- **Kernel**: 5.15.185 (GKI)
+- **Android**: 13
