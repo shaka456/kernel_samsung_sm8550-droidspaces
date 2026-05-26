@@ -76,6 +76,18 @@ The build script automatically copies `vendor-symvers/Module.symvers` to the sou
 
 Pack the resulting `out/arch/arm64/boot/Image.gz` into an AnyKernel3 zip and flash via TWRP.
 
+## Modified Files
+
+The following files were modified from the original Samsung/Android kernel source:
+
+- `arch/arm64/configs/gki_defconfig` — Droidspaces configs enabled, MODVERSIONS disabled, KernelSU-Next configs added
+- `include/linux/sched.h` — KABI reserve slots 3, 4, 5 used for `sysv_sem` and `sysv_shm`
+- `include/linux/vermagic.h` — Vermagic string hardcoded to match vendor module expectations
+- `drivers/Makefile` — KernelSU-Next build entry added
+- `drivers/Kconfig` — KernelSU-Next Kconfig source added
+- `drivers/kernelsu` — Symlink to `../KernelSU-Next/kernel`
+- `scripts/build.sh` — Custom build script with vendor Module.symvers handling
+
 ## Device Info
 
 - **Device**: Samsung Galaxy S23 (SM-S911B)
@@ -83,3 +95,21 @@ Pack the resulting `out/arch/arm64/boot/Image.gz` into an AnyKernel3 zip and fla
 - **GPU**: Adreno 740 (Turnip driver supported)
 - **Kernel**: 5.15.185 (GKI)
 - **Android**: 13
+
+## License
+
+SPDX-License-Identifier: GPL-2.0-only
+
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License version 2 only, as published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program; if not, see the `COPYING` file in this repository, or write to the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+
+The full text of the GNU General Public License version 2 is available at:
+- `COPYING` — Top-level license notice
+- `LICENSES/preferred/GPL-2.0` — Full license text
+
+The original Linux kernel is Copyright (C) Linus Torvalds and others. Modifications for Droidspaces support and KernelSU-Next integration are Copyright (C) 2025 the contributors of this repository.
+
+KernelSU-Next (`KernelSU-Next/`) is a separate project licensed under GPL-2.0-only for kernel code and GPL-3.0-or-later for userspace code. See `KernelSU-Next/LICENSE` for details.
