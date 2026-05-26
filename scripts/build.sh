@@ -2,9 +2,9 @@
 
 set -e
 
-KERNEL_DIR="/home/deck/kernel/kernel5.15.185/kernel_samsung_sm8550-common-5.15.185"
+KERNEL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 KERNEL_DEFCONFIG="gki_defconfig"
-CLANG_DIR="/home/deck/tools/google-clang"
+CLANG_DIR="$(cd "$KERNEL_DIR/../tools/google-clang" && pwd)"
 CLANG_BINARY="$CLANG_DIR/bin/clang"
 VENDOR_SYMVERS="$KERNEL_DIR/vendor-symvers/Module.symvers"
 
