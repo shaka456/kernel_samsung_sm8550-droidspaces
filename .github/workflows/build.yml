@@ -3,8 +3,6 @@ name: Build Kernel
 on:
   push:
     branches: [ main, droidspaces-ksu-v3.2.0 ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -14,8 +12,6 @@ jobs:
     steps:
     - name: Checkout kernel source
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
 
     - name: Install dependencies
       run: |
@@ -34,70 +30,27 @@ jobs:
       if: steps.clang-cache.outputs.cache-hit != 'true'
       run: |
         mkdir -p tools
-        echo "Downloading clang-r547379 (1.1 GB)..."
-        wget -q --show-progress \
-          "https://github.com/shaka456/kernel_samsung_sm8550-droidspaces/releases/download/clang-r547379/clang-r547379.tar.gz" \
-          -O /tmp/clang-r547379.tar.gz
-        tar -xzf /tmp/clang-r547379.tar.gz -C tools/
-        rm /tmp/clang-r547379.tar.gz
+        wget -q "https://github.com/shaka456/kernel_samsung_sm8550-droidspaces/releases/download/clang-r547379/clang-r547379.tar.gz" -O /tmp/clang.tar.gz
+        tar -xzf /tmp/clang.tar.gz -C tools/
+        rm /tmp/clang.tar.gz
 
     - name: Setup KernelSU-Next
       run: |
         git clone --depth=1 -b stable https://github.com/KernelSU-Next/KernelSU-Next.git
         cd drivers
         ln -sf ../KernelSU-Next/kernel kernelsu
-        grep -q "kernelsu" Makefile || echo "obj-\$(CONFIG_KSU) += kernelsu/" >> Makefile
-        grep -q "drivers/kernelsu/Kconfig" Kconfig || \
-          sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' Kconfig
+        echo "obj-\$(CONFIG_KSU) += kernelsu/" >> Makefile
+        sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' Kconfig
 
     - name: Build kernel
-      run: |
-        bash scripts/build.sh
+      run: bash scripts/build.sh
 
     - name: Prepare AnyKernel3 zip
       run: |
-        # Create AnyKernel3 structure
-        mkdir -p anykernel/META-INF/com/google/android
-        mkdir -p anykernel/modules/system/lib/modules
-        mkdir -p anykernel/patch
-        mkdir -p anykernel/ramdisk
-        mkdir -p anykernel/tools
-
-        # Write anykernel.sh
-        cat > anykernel/anykernel.sh << 'EOF'
-### AnyKernel3 Ramdisk Mod Script
-properties() {
-kernel.string=A kernel for S23 QCOM Series
-do.devicecheck=0
-do.modules=0
-do.systemless=1
-do.cleanup=1
-do.cleanuponabort=0
-}
-block=/dev/block/bootdevice/by-name/boot
-is_slot_device=0
-ramdisk_compression=auto
-patch_vbmeta_flag=auto
-. tools/ak3-core.sh
-split_boot
-flash_boot
-EOF
-
-        # Write updater-script
-        cat > anykernel/META-INF/com/google/android/updater-script << 'EOF'
-ui_print("Installing kernel...");
-EOF
-
-        # Download AnyKernel3 tools from release
-        cd anykernel
-        wget -q "https://github.com/osm0sis/AnyKernel3/raw/master/tools/ak3-core.sh" -O tools/ak3-core.sh
-        chmod +x tools/ak3-core.sh
-
-        # Copy compiled kernel
-        cp ../out/arch/arm64/boot/Image.gz Image.gz
-
-        # Create zip
-        zip -r9 ../kernel-5.15.185.zip .
+        wget -q "https://github.com/shaka456/kernel_samsung_sm8550-droidspaces/releases/download/clang-r547379/anykernel3-template.zip" -O /tmp/template.zip
+        unzip -o /tmp/template.zip -d /tmp/anykernel
+        cp out/arch/arm64/boot/Image.gz /tmp/anykernel/
+        cd /tmp/anykernel && zip -r9 ${GITHUB_WORKSPACE}/kernel-5.15.185.zip .
 
     - name: Upload kernel zip
       uses: actions/upload-artifact@v4
