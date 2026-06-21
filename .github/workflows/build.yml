@@ -1,0 +1,72 @@
+name: Build Kernel
+
+on:
+  push:
+    branches: [ main, droidspaces-ksu-v3.2.0 ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout kernel source
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq bc bison cpio flex libelf-dev libssl-dev \
+          perl python3 wget xz-utils zip
+
+    - name: Restore clang cache
+      id: clang-cache
+      uses: actions/cache@v4
+      with:
+        path: tools/google-clang
+        key: clang-r547379
+
+    - name: Download clang toolchain
+      if: steps.clang-cache.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p tools
+        echo "Downloading clang-r547379 (1.1 GB)..."
+        wget -q --show-progress \
+          "https://github.com/shaka456/kernel_samsung_sm8550-droidspaces/releases/download/clang-r547379/clang-r547379.tar.gz" \
+          -O /tmp/clang-r547379.tar.gz
+        tar -xzf /tmp/clang-r547379.tar.gz -C tools/
+        rm /tmp/clang-r547379.tar.gz
+
+    - name: Build kernel
+      run: |
+        bash scripts/build.sh
+
+    - name: Prepare AnyKernel3 zip
+      run: |
+        wget -q "https://github.com/shaka456/kernel_samsung_sm8550-droidspaces/releases/download/clang-r547379/anykernel3-template.zip" \
+          -O /tmp/anykernel3-template.zip
+        unzip -o /tmp/anykernel3-template.zip -d /tmp/anykernel
+        cp out/arch/arm64/boot/Image.gz /tmp/anykernel/Image.gz
+        cd /tmp/anykernel
+        zip -r9 ${GITHUB_WORKSPACE}/kernel-5.15.185.zip .
+
+    - name: Upload kernel zip
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-5.15.185
+        path: kernel-5.15.185.zip
+        compression-level: 0
+        retention-days: 90
+
+    - name: Upload build config
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-config
+        path: out/.config
+        compression-level: 0
+        retention-days: 90
