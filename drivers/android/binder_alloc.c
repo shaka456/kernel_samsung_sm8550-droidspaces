@@ -417,7 +417,7 @@ static struct binder_buffer *binder_alloc_new_buf_locked(
 				alloc->pid, extra_buffers_size);
 		return ERR_PTR(-EINVAL);
 	}
-	trace_android_vh_binder_alloc_new_buf_locked(size, &alloc->free_async_space, is_async);
+	/* trace_android_vh_binder_alloc_new_buf_locked(size, &alloc->free_async_space, is_async); */
 #ifdef CONFIG_SAMSUNG_FREECESS
 	if (is_async && (alloc->free_async_space < 3*(size + sizeof(struct binder_buffer))
 		|| (alloc->free_async_space < alloc->buffer_size/4))) {

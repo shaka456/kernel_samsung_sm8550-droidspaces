@@ -73,6 +73,8 @@
 
 #include <asm/cacheflush.h>
 
+#include <linux/kprobes.h>
+
 #include "binder_internal.h"
 #include "binder_trace.h"
 
@@ -1772,7 +1774,7 @@ static void binder_free_transaction(struct binder_transaction *t)
 {
 	struct binder_proc *target_proc = t->to_proc;
 
-	trace_android_vh_free_oem_binder_struct(t);
+	/* trace_android_vh_free_oem_binder_struct(t); */
 	if (target_proc) {
 		binder_inner_proc_lock(target_proc);
 		target_proc->outstanding_txns--;
@@ -1939,7 +1941,7 @@ static size_t binder_get_object(struct binder_proc *proc,
 	    buffer->data_size >= object_size)
 		return object_size;
 	else
-		return 0;
+	return 0;
 }
 
 /**
@@ -2517,6 +2519,7 @@ err_fget:
 err_fd_not_accepted:
 	return ret;
 }
+NOKPROBE_SYMBOL(binder_translate_fd);
 
 /**
  * struct binder_ptr_fixup - data to be fixed-up in target buffer
@@ -2828,6 +2831,7 @@ static int binder_translate_fd_array(struct list_head *pf_head,
 	}
 	return 0;
 }
+NOKPROBE_SYMBOL(binder_translate_fd_array);
 
 // [ @SystemFW
 static void print_binder_proc_inner(struct binder_proc *proc) 
@@ -2994,7 +2998,6 @@ static int binder_proc_transaction(struct binder_transaction *t,
 	struct binder_node *node = t->buffer->target_node;
 	bool oneway = !!(t->flags & TF_ONE_WAY);
 	bool pending_async = false;
-	bool skip = false;
 	struct binder_transaction *t_outdated = NULL;
 	bool enqueue_task = true;
 
@@ -3022,10 +3025,10 @@ static int binder_proc_transaction(struct binder_transaction *t,
 		return proc->is_frozen ? BR_FROZEN_REPLY : BR_DEAD_REPLY;
 	}
 
-	trace_android_vh_binder_proc_transaction_entry(proc, t,
-		&thread, node->debug_id, pending_async, !oneway, &skip);
+	/* trace_android_vh_binder_proc_transaction_entry(proc, t,
+		&thread, node->debug_id, pending_async, !oneway, &skip); */
 
-	if (!thread && !pending_async && !skip)
+	if (!thread && !pending_async)
 		thread = binder_select_thread_ilocked(proc);
 
 	trace_android_vh_binder_proc_transaction(current, proc->tsk,
@@ -3085,6 +3088,7 @@ static int binder_proc_transaction(struct binder_transaction *t,
 
 	return 0;
 }
+NOKPROBE_SYMBOL(binder_proc_transaction);
 
 /**
  * binder_get_node_refs_for_txn() - Get required refs on node for txn
@@ -3298,7 +3302,7 @@ static void binder_transaction(struct binder_proc *proc,
 		target_proc = target_thread->proc;
 		target_proc->tmp_ref++;
 		binder_inner_proc_unlock(target_thread->proc);
-		trace_android_vh_binder_reply(target_proc, proc, thread, tr);
+		/* trace_android_vh_binder_reply(target_proc, proc, thread, tr); */
 	} else {
 		if (tr->target.handle) {
 			struct binder_ref *ref;
@@ -3357,7 +3361,7 @@ static void binder_transaction(struct binder_proc *proc,
 			return_error_line = __LINE__;
 			goto err_invalid_target_handle;
 		}
-		trace_android_vh_binder_trans(target_proc, proc, thread, tr);
+		/* trace_android_vh_binder_trans(target_proc, proc, thread, tr); */
 #ifdef CONFIG_SAMSUNG_BINDER_MONITOR
 		binder_monitor(proc->pid, thread->pid, tr->code, target_proc->pid);
 #endif
@@ -3568,7 +3572,7 @@ static void binder_transaction(struct binder_proc *proc,
 	t->buffer->target_node = target_node;
 	t->buffer->clear_on_free = !!(t->flags & TF_CLEAR_BUF);
 	trace_binder_transaction_alloc_buf(t->buffer);
-	trace_android_vh_alloc_oem_binder_struct(tr, t, target_proc);
+	/* trace_android_vh_alloc_oem_binder_struct(tr, t, target_proc); */
 
 	if (binder_alloc_copy_user_to_buffer(
 				&target_proc->alloc,
@@ -4040,6 +4044,7 @@ err_invalid_target_handle:
 		binder_enqueue_thread_work(thread, &thread->return_error.work);
 	}
 }
+NOKPROBE_SYMBOL(binder_transaction);
 
 static int
 binder_request_freeze_notification(struct binder_proc *proc,
@@ -5273,7 +5278,7 @@ skip:
 		ptr += trsize;
 
 		trace_binder_transaction_received(t);
-		trace_android_vh_binder_transaction_received(t, proc, thread, cmd);
+		/* trace_android_vh_binder_transaction_received(t, proc, thread, cmd); */
 		binder_stat_br(proc, thread, cmd);
 		binder_debug(BINDER_DEBUG_TRANSACTION,
 			     "%d:%d %s %d %d:%d, cmd %d size %zd-%zd ptr %016llx-%016llx\n",
@@ -6153,7 +6158,7 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		goto err;
 	}
 	ret = 0;
-	trace_android_vh_binder_ioctl_end(current, cmd, arg, thread, proc, &ret);
+	/* trace_android_vh_binder_ioctl_end(current, cmd, arg, thread, proc, &ret); */
 err:
 	if (thread)
 		thread->looper_need_return = false;
@@ -6164,6 +6169,7 @@ err_unlocked:
 	trace_binder_ioctl_done(ret);
 	return ret;
 }
+NOKPROBE_SYMBOL(binder_ioctl);
 
 static void binder_vma_open(struct vm_area_struct *vma)
 {
