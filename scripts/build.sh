@@ -4,20 +4,35 @@ set -e
 
 KERNEL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 KERNEL_DEFCONFIG="gki_defconfig"
+CLANG_VERSION="clang-r547379"
 VENDOR_SYMVERS="$KERNEL_DIR/vendor-symvers/Module.symvers"
 
-if [ -d "$KERNEL_DIR/../tools/google-clang" ]; then
-    CLANG_DIR="$(cd "$KERNEL_DIR/../tools/google-clang" && pwd)"
-elif [ -d "/home/deck/tools/google-clang" ]; then
-    CLANG_DIR="/home/deck/tools/google-clang"
-else
-    CLANG_DIR="${CLANG_DIR_OVERRIDE:-}"
+CLANG_DIR="${CLANG_DIR_OVERRIDE:-}"
+if [ -z "$CLANG_DIR" ] || [ ! -f "$CLANG_DIR/bin/clang" ]; then
+    for dir in "$KERNEL_DIR/../tools/google-clang" "/home/deck/tools/google-clang" "$KERNEL_DIR/tools/google-clang"; do
+        if [ -d "$dir" ]; then
+            CLANG_DIR="$dir"
+            break
+        fi
+    done
 fi
 
 if [ -z "$CLANG_DIR" ] || [ ! -f "$CLANG_DIR/bin/clang" ]; then
-    echo "ERROR: clang not found. Set CLANG_DIR_OVERRIDE env var."
-    echo "Usage: CLANG_DIR_OVERRIDE=/path/to/clang ./scripts/build.sh"
-    exit 1
+    CLANG_DIR="$KERNEL_DIR/tools/google-clang"
+    echo "Clang not found locally. Downloading $CLANG_VERSION from GitHub Releases..."
+    mkdir -p "$KERNEL_DIR/tools"
+    CLANG_URL="https://github.com/shaka456/kernel_samsung_sm8550-droidspaces/releases/download/$CLANG_VERSION/$CLANG_VERSION.tar.gz"
+    if command -v wget &>/dev/null; then
+        wget -q --show-progress "$CLANG_URL" -O "/tmp/$CLANG_VERSION.tar.gz"
+    elif command -v curl &>/dev/null; then
+        curl -L "$CLANG_URL" -o "/tmp/$CLANG_VERSION.tar.gz"
+    else
+        echo "ERROR: wget or curl required to download clang."
+        exit 1
+    fi
+    tar -xzf "/tmp/$CLANG_VERSION.tar.gz" -C "$KERNEL_DIR/tools"
+    rm "/tmp/$CLANG_VERSION.tar.gz"
+    echo "Clang downloaded and extracted to $CLANG_DIR"
 fi
 
 CLANG_BINARY="$CLANG_DIR/bin/clang"
